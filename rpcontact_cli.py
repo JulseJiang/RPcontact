@@ -771,7 +771,7 @@ def predict(
             "results_zip": "rpcontact_results.zip",
         },
         "index_note": "Nucleotide and residue labels use 1-based indexing.",
-        "long_sequence_note": "Use --save-npy to keep the full NumPy score matrix and --plot-heatmap to generate a full-resolution PNG.",
+        "note": "Use --save-npy to keep the full NumPy score matrix and --plot-heatmap to generate a full-resolution PNG.",
     }
     full_map_path = out_dir / "rpcontact_full_map.txt"
     write_full_map_txt(scores_path, full_map_path, pro_seq, rna_seq)
@@ -805,12 +805,12 @@ def build_parser():
         required=True,
         help="Input directory or ZIP with pro.fasta, rna.fasta, and optional pro/rna embeddings (.npy, .pickle, or .pkl).",
     )
-    parser.add_argument("-o", "--out-dir", default="rpcontact_long_output", help="Output directory.")
+    parser.add_argument("-o", "--out-dir", default="rpcontact_output", help="Output directory.")
     parser.add_argument("--threshold", type=float, default=0.0, help="Contact threshold used for top-pair filtering.")
     parser.add_argument("--top-k", type=int, default=100, help="Number of top contacts to export after threshold filtering.")
     parser.add_argument("--pro-chunk", type=int, default=256, help="Protein chunk size for writing scores.")
     parser.add_argument("--rna-chunk", type=int, default=256, help="RNA chunk size for writing scores.")
-    parser.add_argument("--plot-heatmap", action="store_true", help="Generate a full-resolution heatmap PNG. Disabled by default for long sequences.")
+    parser.add_argument("--plot-heatmap", action="store_true", help="Generate a full-resolution heatmap PNG. Disabled by default.")
     parser.add_argument("--save-npy", action="store_true", help="Keep rpcontact_scores.npy in the output directory and result ZIP.")
     parser.add_argument("--plots", action="store_true", help="Generate diagnostic top-score distribution plots.")
     parser.add_argument("--device", default="cpu", help="Torch device, e.g. cpu or cuda:0.")

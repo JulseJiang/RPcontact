@@ -121,7 +121,7 @@ Keep the NumPy score matrix and diagnostic plots:
 python rpcontact_cli.py -i input.zip -o output --save-npy --plots
 ```
 
-For long sequences, heatmap generation is disabled by default. The full article-style score map is still written to `rpcontact_full_map.txt`.
+Heatmap PNG generation is optional. The full article-style score map is always written to `rpcontact_full_map.txt`.
 
 ---
 
