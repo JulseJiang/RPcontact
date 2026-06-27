@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="example/logo.png" alt="RPcontact Logo" width="120"/>
+  <img src="figure/logo.png" alt="RPcontact Logo" width="120"/>
 </p>
 
 # RPcontact: RNA-Protein Contact Prediction
