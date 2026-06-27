@@ -817,6 +817,44 @@ def build_parser():
     return parser
 
 
+def format_summary_for_cli(summary):
+    outputs = summary.get("outputs", {})
+    shape = summary.get("score_shape", [0, 0])
+    lines = [
+        "RPcontact prediction completed.",
+        "",
+        "Run summary",
+        f"  Mode: {summary.get('mode')}",
+        f"  Model: {summary.get('model')}",
+        f"  Contact matrix: {shape[0]} protein residues x {shape[1]} RNA nucleotides",
+        f"  Threshold: {summary.get('threshold')}",
+        f"  Top contacts exported: {summary.get('top_k')} of requested {summary.get('requested_top_k')}",
+        f"  Contacts passing threshold: {summary.get('contacts_at_threshold')}",
+        f"  Max score: {summary.get('max_score'):.6f}",
+        f"  Mean score: {summary.get('mean_score'):.6f}",
+    ]
+    if summary.get("input_note"):
+        lines.append(f"  Input: {summary.get('input_note')}")
+    if summary.get("embedding_warning"):
+        lines.extend(["", f"WARNING: {summary.get('embedding_warning')}"])
+    lines.extend(
+        [
+            "",
+            "Output files",
+            f"  Full contact probability matrix: {outputs.get('full_map_txt')}",
+            f"  Top contact table: {outputs.get('top_pairs_csv')}",
+            "  Run summary JSON: rpcontact_summary.json",
+            f"  Result bundle: {outputs.get('results_zip')}",
+        ]
+    )
+    if outputs.get("scores_npy"):
+        lines.append(f"  NumPy score matrix: {outputs.get('scores_npy')}")
+    if outputs.get("contact_map_png"):
+        lines.append(f"  Contact map PNG: {outputs.get('contact_map_png')}")
+    lines.extend(["", summary.get("index_note", ""), summary.get("note", "")])
+    return "\n".join(line for line in lines if line is not None)
+
+
 def main():
     args = build_parser().parse_args()
     summary = predict(
@@ -831,7 +869,7 @@ def main():
         save_npy=args.save_npy,
         plots=args.plots,
     )
-    print(json.dumps(summary, indent=2))
+    print(format_summary_for_cli(summary))
 
 
 if __name__ == "__main__":
