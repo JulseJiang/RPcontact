@@ -265,8 +265,26 @@ def standardize_feature_order(features, sequence, alphabet, raw_dim, full_dim, n
     return features.astype(np.float32, copy=False)
 
 
-def load_zip_inputs(zip_path, model_variant="rpcontact"):
-    preset = EMBEDDING_PRESETS[model_variant]
+def select_embedding_variant(protein_dim, rna_dim, requested="auto"):
+    if requested != "auto":
+        if requested not in EMBEDDING_PRESETS:
+            raise ValueError(f"Unknown model variant: {requested}")
+        return requested
+    matches = [
+        name for name, preset in EMBEDDING_PRESETS.items()
+        if protein_dim in (preset["protein_raw_dim"], preset["protein_raw_dim"] + 20)
+        and rna_dim in (preset["rna_raw_dim"], preset["rna_raw_dim"] + 4)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"No unique bundled checkpoint matches protein/RNA embedding dimensions {protein_dim}/{rna_dim}. "
+            "Expected ESM-2/ERNIE-RNA (5120/768 raw channels) or ESMC-6B/RESM (2560/1280 raw channels), "
+            "optionally with one-hot channels."
+        )
+    return matches[0]
+
+
+def load_zip_inputs(zip_path, model_variant="auto"):
     with zipfile.ZipFile(zip_path) as archive:
         members = {Path(name).name.lower(): name for name in archive.namelist() if not name.endswith("/")}
         missing = [name for name in ["pro.fasta", "rna.fasta"] if name not in members]
@@ -292,6 +310,7 @@ def load_zip_inputs(zip_path, model_variant="rpcontact"):
                     raise ValueError(
                         f"{rna_embed_name} length {rna.shape[0]} does not match rna.fasta length {len(rna_seq)}"
                     )
+                preset = EMBEDDING_PRESETS[select_embedding_variant(protein.shape[1], rna.shape[1], model_variant)]
                 protein = standardize_feature_order(
                     protein, pro_seq, "ACDEFGHIKLMNPQRSTVWY", preset["protein_raw_dim"],
                     preset["protein_raw_dim"] + 20, pro_embed_name
@@ -301,8 +320,12 @@ def load_zip_inputs(zip_path, model_variant="rpcontact"):
                 )
                 return protein, rna, pro_seq, rna_seq, "embedding", f"{pro_embed_name}/{rna_embed_name} loaded"
             except Exception as exc:
+                if model_variant == "auto":
+                    raise ValueError(f"Cannot select an embedding checkpoint: {exc}") from exc
                 note = f"embedding fallback: {exc}"
         elif any(name in members for name in ["pro.npy", "rna.npy", "pro.pickle", "rna.pickle", "pro.pkl", "rna.pkl"]):
+            if model_variant == "auto":
+                raise ValueError("Provide protein and RNA embeddings together with the same format.")
             note = "embedding fallback: protein and RNA embeddings must be provided together with the same format"
         else:
             note = "embedding fallback: pro/rna embedding files not found"
@@ -312,8 +335,7 @@ def load_zip_inputs(zip_path, model_variant="rpcontact"):
         return protein, rna, pro_seq, rna_seq, "one-hot", note
 
 
-def load_directory_inputs(input_dir, model_variant="rpcontact"):
-    preset = EMBEDDING_PRESETS[model_variant]
+def load_directory_inputs(input_dir, model_variant="auto"):
     input_dir = Path(input_dir)
     files = {path.name.lower(): path for path in input_dir.iterdir() if path.is_file()}
     missing = [name for name in ["pro.fasta", "rna.fasta"] if name not in files]
@@ -339,6 +361,7 @@ def load_directory_inputs(input_dir, model_variant="rpcontact"):
                 raise ValueError(
                     f"{rna_embed_name} length {rna.shape[0]} does not match rna.fasta length {len(rna_seq)}"
                 )
+            preset = EMBEDDING_PRESETS[select_embedding_variant(protein.shape[1], rna.shape[1], model_variant)]
             protein = standardize_feature_order(
                 protein, pro_seq, "ACDEFGHIKLMNPQRSTVWY", preset["protein_raw_dim"],
                 preset["protein_raw_dim"] + 20, pro_embed_name
@@ -348,8 +371,12 @@ def load_directory_inputs(input_dir, model_variant="rpcontact"):
             )
             return protein, rna, pro_seq, rna_seq, "embedding", f"{pro_embed_name}/{rna_embed_name} loaded"
         except Exception as exc:
+            if model_variant == "auto":
+                raise ValueError(f"Cannot select an embedding checkpoint: {exc}") from exc
             note = f"embedding fallback: {exc}"
     elif any(name in files for name in ["pro.npy", "rna.npy", "pro.pickle", "rna.pickle", "pro.pkl", "rna.pkl"]):
+        if model_variant == "auto":
+            raise ValueError("Provide protein and RNA embeddings together with the same format.")
         note = "embedding fallback: protein and RNA embeddings must be provided together with the same format"
     else:
         note = "embedding fallback: pro/rna embedding files not found"
@@ -359,7 +386,7 @@ def load_directory_inputs(input_dir, model_variant="rpcontact"):
     return protein, rna, pro_seq, rna_seq, "one-hot", note
 
 
-def load_inputs(input_path, model_variant="rpcontact"):
+def load_inputs(input_path, model_variant="auto"):
     input_path = Path(input_path)
     if input_path.is_dir():
         return load_directory_inputs(input_path, model_variant=model_variant)
@@ -716,18 +743,19 @@ def predict(
     plot_heatmap=False,
     save_npy=False,
     plots=False,
-    model_variant="rpcontact",
+    model_variant="auto",
 ):
     input_zip = Path(input_zip)
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    if model_variant not in EMBEDDING_PRESETS:
+    if model_variant != "auto" and model_variant not in EMBEDDING_PRESETS:
         raise ValueError(f"Unknown model variant: {model_variant}")
     protein, rna, pro_seq, rna_seq, mode, note = load_inputs(input_zip, model_variant=model_variant)
-    if model_variant != "rpcontact" and mode != "embedding":
+    if model_variant not in ("auto", "rpcontact") and mode != "embedding":
         raise ValueError(f"{model_variant} requires matching RNA/protein embeddings. {note}")
-    checkpoint_path = EMBEDDING_PRESETS[model_variant]["checkpoint"] if mode == "embedding" else ONEHOT_CHECKPOINT
+    selected_variant = select_embedding_variant(protein.shape[1], rna.shape[1], model_variant) if mode == "embedding" else "onehot"
+    checkpoint_path = EMBEDDING_PRESETS[selected_variant]["checkpoint"] if mode == "embedding" else ONEHOT_CHECKPOINT
     embedding_warning = make_embedding_warning(mode, note)
     if embedding_warning:
         print(f"WARNING: {embedding_warning}", file=sys.stderr)
@@ -774,7 +802,7 @@ def predict(
 
     summary = {
         "mode": mode,
-        "model_variant": model_variant,
+        "model_variant": selected_variant,
         "model": f"bundled checkpoint: {checkpoint_path.name}",
         "input_note": note,
         "embedding_warning": embedding_warning,
@@ -833,8 +861,8 @@ def build_parser():
     )
     parser.add_argument("-o", "--out-dir", default="rpcontact_output", help="Output directory.")
     parser.add_argument(
-        "--model", choices=sorted(EMBEDDING_PRESETS), default="rpcontact",
-        help="Embedding checkpoint: rpcontact (ERNIE-RNA/ESM-2) or resm-esmc6b (RESM-650M/ESMC-6B).",
+        "--model", choices=["auto", *sorted(EMBEDDING_PRESETS)], default="auto",
+        help="Select from embedding dimensions by default; optionally force rpcontact or resm-esmc6b.",
     )
     parser.add_argument("--threshold", type=float, default=0.0, help="Contact threshold used for top-pair filtering.")
     parser.add_argument("--top-k", type=int, default=100, help="Number of top contacts to export after threshold filtering.")

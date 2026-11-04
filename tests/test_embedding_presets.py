@@ -18,16 +18,21 @@ class EmbeddingPresetTests(unittest.TestCase):
 
     def test_existing_default_is_retained(self):
         args = cli.build_parser().parse_args(['-i', 'input.zip'])
-        self.assertEqual(args.model, 'rpcontact')
+        self.assertEqual(args.model, 'auto')
         protein, rna, _, _, mode, _ = cli.load_inputs(ROOT / 'examples/rpcontact_example_input.zip')
         self.assertEqual(mode, 'embedding')
         self.assertEqual((protein.shape[1], rna.shape[1]), (5140, 772))
+        self.assertEqual(cli.select_embedding_variant(protein.shape[1], rna.shape[1]), 'rpcontact')
+        explicit = cli.load_inputs(ROOT / 'examples/rpcontact_example_input.zip', model_variant='rpcontact')
+        np.testing.assert_array_equal(protein, explicit[0])
+        np.testing.assert_array_equal(rna, explicit[1])
 
     def test_resm_zip_and_directory_feature_layouts(self):
         archive = ROOT / 'examples/rpcontact_resm_esmc6b_input.zip'
-        protein, rna, pro_seq, rna_seq, mode, _ = cli.load_inputs(archive, model_variant='resm-esmc6b')
+        protein, rna, pro_seq, rna_seq, mode, _ = cli.load_inputs(archive)
         self.assertEqual(mode, 'embedding')
         self.assertEqual((protein.shape, rna.shape), ((56, 2580), (41, 1284)))
+        self.assertEqual(cli.select_embedding_variant(protein.shape[1], rna.shape[1]), 'resm-esmc6b')
         np.testing.assert_array_equal(protein[:, :20], cli.sequence_to_onehot(pro_seq, 'ACDEFGHIKLMNPQRSTVWY'))
         np.testing.assert_array_equal(rna[:, :4], cli.sequence_to_onehot(rna_seq, 'ACGU'))
         with tempfile.TemporaryDirectory() as tmp:
@@ -40,11 +45,28 @@ class EmbeddingPresetTests(unittest.TestCase):
                 elif layout == 'onehot-last':
                     np.save(directory / 'pro.npy', np.concatenate([protein[:, 20:], protein[:, :20]], axis=1))
                     np.save(directory / 'rna.npy', np.concatenate([rna[:, 4:], rna[:, :4]], axis=1))
-                actual = cli.load_inputs(directory, model_variant='resm-esmc6b')
-                with self.subTest(layout=layout):
-                    self.assertEqual(actual[4], 'embedding')
-                    np.testing.assert_array_equal(actual[0], protein)
-                    np.testing.assert_array_equal(actual[1], rna)
+                for variant in ['auto', 'resm-esmc6b']:
+                    actual = cli.load_inputs(directory, model_variant=variant)
+                    with self.subTest(layout=layout, model=variant):
+                        self.assertEqual(actual[4], 'embedding')
+                        np.testing.assert_array_equal(actual[0], protein)
+                        np.testing.assert_array_equal(actual[1], rna)
+
+    def test_auto_rejects_unmatched_or_incomplete_embeddings(self):
+        for protein_dim, rna_dim in [(5120, 1280), (2560, 768), (100, 100)]:
+            with self.subTest(dimensions=(protein_dim, rna_dim)):
+                with self.assertRaisesRegex(ValueError, 'No unique bundled checkpoint'):
+                    cli.select_embedding_variant(protein_dim, rna_dim)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'pro.fasta').write_text('>protein\nMTTU\n')
+            (root / 'rna.fasta').write_text('>rna\nACTT\n')
+            np.save(root / 'pro.npy', np.zeros((4, 2560), dtype=np.float32))
+            with self.assertRaisesRegex(ValueError, 'together'):
+                cli.load_inputs(root)
+            np.save(root / 'rna.npy', np.zeros((4, 768), dtype=np.float32))
+            with self.assertRaisesRegex(ValueError, 'No unique bundled checkpoint'):
+                cli.load_inputs(root)
 
     def test_resm_request_rejects_wrong_or_missing_embeddings(self):
         with tempfile.TemporaryDirectory() as tmp:

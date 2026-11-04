@@ -62,7 +62,6 @@ To run the RESM-650M + ESMC-6B model with its bundled real input:
 
 ```bash
 python rpcontact_cli.py \
-  --model resm-esmc6b \
   -i examples/rpcontact_resm_esmc6b_input.zip \
   -o output_resm_esmc6b --save-npy
 ```
@@ -96,7 +95,9 @@ ZIP example:
 zip -r input.zip input/
 ```
 
-If optional embedding files are missing, RPcontact runs the one-hot model. If embedding files are present but cannot be used, RPcontact prints a `WARNING`, records the reason in `rpcontact_summary.json`, and falls back to the one-hot model.
+The CLI selects the bundled checkpoint from the paired RNA/protein embedding
+dimensions. With FASTA files only, it runs the one-hot model. In automatic mode,
+incomplete, invalid or unsupported embedding inputs produce an error.
 
 ---
 
@@ -148,7 +149,7 @@ Heatmap PNG generation is optional. The full article-style score map is always w
 |-----------|-------------|
 | `-i`, `--input` | Input directory or ZIP containing FASTA files and optional `.npy` embeddings |
 | `-o`, `--out-dir` | Output directory |
-| `--model` | `rpcontact` (default: ERNIE-RNA + ESM-2) or `resm-esmc6b` (RESM-650M + ESMC-6B) |
+| `--model` | `auto` (default: infer from embedding dimensions); optionally force `rpcontact` or `resm-esmc6b` |
 | `--threshold` | Minimum score for top-contact filtering |
 | `--top-k` | Number of top contacts to export |
 | `--pro-chunk` | Protein block size for score writing |
@@ -188,16 +189,25 @@ The downstream predictor weights are included as
 [`models/rpcontact_resm_esmc6b_state_dict.pt`](models/rpcontact_resm_esmc6b_state_dict.pt).
 The model was selected from the five cross-validation runs using the highest
 validation-fold Global auROC (fold0, epoch13, validation Global auROC 0.855859).
-The [checkpoint metadata](models/rpcontact_resm_esmc6b.json) records its SHA256,
-selection rule and input dimensions. Test results were excluded from selection.
+Test results were excluded from selection.
+
+No model configuration file is required. The bundled embedding checkpoints are
+selected automatically using both input dimensions:
+
+| RNA embedding channels | Protein embedding channels | Checkpoint |
+|---|---|---|
+| 768 (772 with one-hot) | 5120 (5140 with one-hot) | ERNIE-RNA + ESM-2 |
+| 1280 (1284 with one-hot) | 2560 (2580 with one-hot) | RESM-650M + ESMC-6B |
 
 For your own sequences, supply fixed per-position embeddings from **RESM-650M-KDNY**
 for RNA (`rna.npy`: `[RNA length, 1280]`) and **ESMC-6B** for protein (`pro.npy`:
 `[protein length, 2560]`). Remove special tokens and retain every sequence position.
 The CLI adds RNA/protein one-hot channels, giving 1284/2580 total input channels.
 Arrays with one-hot channels already included are also accepted in either
-one-hot-first or one-hot-last order. Use `--model resm-esmc6b`; missing or
-incompatible embeddings produce an error for this model.
+one-hot-first or one-hot-last order. Model selection is automatic; `--model
+resm-esmc6b` is available as an optional manual override. Supply embeddings from
+the corresponding encoders; matching channel counts alone do not make other
+language-model embeddings interchangeable.
 
 These are the trained contact-prediction weights; RNA/protein language-model
 embedding extraction is a separate step. The ERNIE-RNA and ESM-2 helper scripts
