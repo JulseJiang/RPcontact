@@ -31,6 +31,18 @@ DEFAULT_N_HEAD = 4
 DEFAULT_SYNC = True
 EMBEDDING_PRO_DIM = 5140
 EMBEDDING_RNA_DIM = 772
+EMBEDDING_PRESETS = {
+    "rpcontact": {
+        "checkpoint": EMBEDDING_CHECKPOINT,
+        "protein_raw_dim": 5120,
+        "rna_raw_dim": 768,
+    },
+    "resm-esmc6b": {
+        "checkpoint": MODEL_DIR / "rpcontact_resm_esmc6b_state_dict.pt",
+        "protein_raw_dim": 2560,
+        "rna_raw_dim": 1280,
+    },
+}
 
 
 def rotate_half(x):
@@ -253,7 +265,8 @@ def standardize_feature_order(features, sequence, alphabet, raw_dim, full_dim, n
     return features.astype(np.float32, copy=False)
 
 
-def load_zip_inputs(zip_path):
+def load_zip_inputs(zip_path, model_variant="rpcontact"):
+    preset = EMBEDDING_PRESETS[model_variant]
     with zipfile.ZipFile(zip_path) as archive:
         members = {Path(name).name.lower(): name for name in archive.namelist() if not name.endswith("/")}
         missing = [name for name in ["pro.fasta", "rna.fasta"] if name not in members]
@@ -280,9 +293,12 @@ def load_zip_inputs(zip_path):
                         f"{rna_embed_name} length {rna.shape[0]} does not match rna.fasta length {len(rna_seq)}"
                     )
                 protein = standardize_feature_order(
-                    protein, pro_seq, "ACDEFGHIKLMNPQRSTVWY", 5120, EMBEDDING_PRO_DIM, pro_embed_name
+                    protein, pro_seq, "ACDEFGHIKLMNPQRSTVWY", preset["protein_raw_dim"],
+                    preset["protein_raw_dim"] + 20, pro_embed_name
                 )
-                rna = standardize_feature_order(rna, rna_seq, "ACGU", 768, EMBEDDING_RNA_DIM, rna_embed_name)
+                rna = standardize_feature_order(
+                    rna, rna_seq, "ACGU", preset["rna_raw_dim"], preset["rna_raw_dim"] + 4, rna_embed_name
+                )
                 return protein, rna, pro_seq, rna_seq, "embedding", f"{pro_embed_name}/{rna_embed_name} loaded"
             except Exception as exc:
                 note = f"embedding fallback: {exc}"
@@ -296,7 +312,8 @@ def load_zip_inputs(zip_path):
         return protein, rna, pro_seq, rna_seq, "one-hot", note
 
 
-def load_directory_inputs(input_dir):
+def load_directory_inputs(input_dir, model_variant="rpcontact"):
+    preset = EMBEDDING_PRESETS[model_variant]
     input_dir = Path(input_dir)
     files = {path.name.lower(): path for path in input_dir.iterdir() if path.is_file()}
     missing = [name for name in ["pro.fasta", "rna.fasta"] if name not in files]
@@ -323,9 +340,12 @@ def load_directory_inputs(input_dir):
                     f"{rna_embed_name} length {rna.shape[0]} does not match rna.fasta length {len(rna_seq)}"
                 )
             protein = standardize_feature_order(
-                protein, pro_seq, "ACDEFGHIKLMNPQRSTVWY", 5120, EMBEDDING_PRO_DIM, pro_embed_name
+                protein, pro_seq, "ACDEFGHIKLMNPQRSTVWY", preset["protein_raw_dim"],
+                preset["protein_raw_dim"] + 20, pro_embed_name
             )
-            rna = standardize_feature_order(rna, rna_seq, "ACGU", 768, EMBEDDING_RNA_DIM, rna_embed_name)
+            rna = standardize_feature_order(
+                rna, rna_seq, "ACGU", preset["rna_raw_dim"], preset["rna_raw_dim"] + 4, rna_embed_name
+            )
             return protein, rna, pro_seq, rna_seq, "embedding", f"{pro_embed_name}/{rna_embed_name} loaded"
         except Exception as exc:
             note = f"embedding fallback: {exc}"
@@ -339,12 +359,12 @@ def load_directory_inputs(input_dir):
     return protein, rna, pro_seq, rna_seq, "one-hot", note
 
 
-def load_inputs(input_path):
+def load_inputs(input_path, model_variant="rpcontact"):
     input_path = Path(input_path)
     if input_path.is_dir():
-        return load_directory_inputs(input_path)
+        return load_directory_inputs(input_path, model_variant=model_variant)
     if input_path.is_file() and input_path.suffix.lower() == ".zip":
-        return load_zip_inputs(input_path)
+        return load_zip_inputs(input_path, model_variant=model_variant)
     raise ValueError(
         "Input must be a directory or a .zip file containing pro.fasta, rna.fasta, and optional pro/rna embeddings."
     )
@@ -696,13 +716,18 @@ def predict(
     plot_heatmap=False,
     save_npy=False,
     plots=False,
+    model_variant="rpcontact",
 ):
     input_zip = Path(input_zip)
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    protein, rna, pro_seq, rna_seq, mode, note = load_inputs(input_zip)
-    checkpoint_path = EMBEDDING_CHECKPOINT if mode == "embedding" else ONEHOT_CHECKPOINT
+    if model_variant not in EMBEDDING_PRESETS:
+        raise ValueError(f"Unknown model variant: {model_variant}")
+    protein, rna, pro_seq, rna_seq, mode, note = load_inputs(input_zip, model_variant=model_variant)
+    if model_variant != "rpcontact" and mode != "embedding":
+        raise ValueError(f"{model_variant} requires matching RNA/protein embeddings. {note}")
+    checkpoint_path = EMBEDDING_PRESETS[model_variant]["checkpoint"] if mode == "embedding" else ONEHOT_CHECKPOINT
     embedding_warning = make_embedding_warning(mode, note)
     if embedding_warning:
         print(f"WARNING: {embedding_warning}", file=sys.stderr)
@@ -749,6 +774,7 @@ def predict(
 
     summary = {
         "mode": mode,
+        "model_variant": model_variant,
         "model": f"bundled checkpoint: {checkpoint_path.name}",
         "input_note": note,
         "embedding_warning": embedding_warning,
@@ -806,6 +832,10 @@ def build_parser():
         help="Input directory or ZIP with pro.fasta, rna.fasta, and optional pro/rna embeddings (.npy, .pickle, or .pkl).",
     )
     parser.add_argument("-o", "--out-dir", default="rpcontact_output", help="Output directory.")
+    parser.add_argument(
+        "--model", choices=sorted(EMBEDDING_PRESETS), default="rpcontact",
+        help="Embedding checkpoint: rpcontact (ERNIE-RNA/ESM-2) or resm-esmc6b (RESM-650M/ESMC-6B).",
+    )
     parser.add_argument("--threshold", type=float, default=0.0, help="Contact threshold used for top-pair filtering.")
     parser.add_argument("--top-k", type=int, default=100, help="Number of top contacts to export after threshold filtering.")
     parser.add_argument("--pro-chunk", type=int, default=256, help="Protein chunk size for writing scores.")
@@ -868,6 +898,7 @@ def main():
         plot_heatmap=args.plot_heatmap,
         save_npy=args.save_npy,
         plots=args.plots,
+        model_variant=args.model,
     )
     print(format_summary_for_cli(summary))
 
