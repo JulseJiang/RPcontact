@@ -2,6 +2,6 @@
 set -euo pipefail
 
 python rpcontact_cli.py \
-  -i examples/rpcontact_example_input.zip \
+  -i examples/input.zip \
   -o output \
   --top-k 100

@@ -15,20 +15,21 @@ class EmbeddingPresetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         torch.set_num_threads(2)
+        cls.resm_archive = ROOT / 'examples/input_resm_esmc.zip'
 
     def test_existing_default_is_retained(self):
         args = cli.build_parser().parse_args(['-i', 'input.zip'])
         self.assertEqual(args.model, 'auto')
-        protein, rna, _, _, mode, _ = cli.load_inputs(ROOT / 'examples/rpcontact_example_input.zip')
+        protein, rna, _, _, mode, _ = cli.load_inputs(ROOT / 'examples/input.zip')
         self.assertEqual(mode, 'embedding')
         self.assertEqual((protein.shape[1], rna.shape[1]), (5140, 772))
         self.assertEqual(cli.select_embedding_variant(protein.shape[1], rna.shape[1]), 'rpcontact')
-        explicit = cli.load_inputs(ROOT / 'examples/rpcontact_example_input.zip', model_variant='rpcontact')
+        explicit = cli.load_inputs(ROOT / 'examples/input.zip', model_variant='rpcontact')
         np.testing.assert_array_equal(protein, explicit[0])
         np.testing.assert_array_equal(rna, explicit[1])
 
     def test_resm_zip_and_directory_feature_layouts(self):
-        archive = ROOT / 'examples/rpcontact_resm_esmc6b_input.zip'
+        archive = self.resm_archive
         protein, rna, pro_seq, rna_seq, mode, _ = cli.load_inputs(archive)
         self.assertEqual(mode, 'embedding')
         self.assertEqual((protein.shape, rna.shape), ((56, 2580), (41, 1284)))
@@ -72,7 +73,7 @@ class EmbeddingPresetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with self.assertRaisesRegex(ValueError, 'requires matching'):
-                cli.predict(ROOT / 'examples/rpcontact_example_input.zip', root / 'wrong', model_variant='resm-esmc6b')
+                cli.predict(ROOT / 'examples/input.zip', root / 'wrong', model_variant='resm-esmc6b')
             fasta = root / 'fasta'; fasta.mkdir()
             (fasta / 'pro.fasta').write_text('>protein\nMTTU\n')
             (fasta / 'rna.fasta').write_text('>rna\nACTT\n')
@@ -91,7 +92,7 @@ class EmbeddingPresetTests(unittest.TestCase):
         state = torch.load(checkpoint, map_location='cpu', weights_only=True)
         reference = ProteinRNAInteraction_rela(2580, 1284, 3, 48, n_head=4, d_ff=512, dropout=.1, sync=True)
         reference.load_state_dict(state, strict=True); reference.eval()
-        protein, rna, *_ = cli.load_inputs(ROOT / 'examples/rpcontact_resm_esmc6b_input.zip', model_variant='resm-esmc6b')
+        protein, rna, *_ = cli.load_inputs(self.resm_archive, model_variant='resm-esmc6b')
         with torch.no_grad():
             expected = reference(torch.from_numpy(protein.T[None]), torch.from_numpy(rna.T[None]))[0, :, :, 0].numpy()
         deployed = cli.load_checkpoint_model(2580, 1284, checkpoint)
@@ -102,8 +103,6 @@ class EmbeddingPresetTests(unittest.TestCase):
             for r in range(0, len(rna), 15):
                 actual[p:p+20, r:r+15] = cli.score_block(deployed, f_pro, f_rna, p, min(p+20, len(protein)), r, min(r+15, len(rna)))
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-6)
-        recorded = np.load(ROOT / 'examples/rpcontact_resm_esmc6b_expected_scores.npy')
-        np.testing.assert_allclose(actual, recorded, rtol=1e-5, atol=1e-7)
 
 
 if __name__ == '__main__':

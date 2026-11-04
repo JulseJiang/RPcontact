@@ -49,7 +49,7 @@ Or run the same command manually:
 
 ```bash
 python rpcontact_cli.py \
-  -i examples/rpcontact_example_input.zip \
+  -i examples/input.zip \
   -o output \
   --top-k 100
 ```
@@ -58,35 +58,18 @@ The example ZIP contains `pro.fasta`, `rna.fasta`, `pro.npy`, and `rna.npy`, so 
 The example is the 2ZZN_D_B complex. Its protein FASTA and one-hot features preserve threonine (`T`).
 By default, RPcontact exports the top 100 predicted contact pairs and the full contact probability matrix.
 
-To run the RESM-650M + ESMC-6B model with its bundled real input:
+Run the RESM-650M + ESMC-6B input with the same command format:
 
 ```bash
-python rpcontact_cli.py \
-  -i examples/rpcontact_resm_esmc6b_input.zip \
-  -o output_resm_esmc6b --save-npy
+python rpcontact_cli.py -i examples/input_resm_esmc.zip -o output_resm_esmc
 ```
 
-This example is the 6ZYM_Y_t validation pair (41 RNA nucleotides and 56 protein
-residues). It demonstrates inference with the alternative encoders.
+Both ZIPs contain the same four filenames and use automatic checkpoint selection:
 
-The optional reference matrix
-[`examples/rpcontact_resm_esmc6b_expected_scores.npy`](examples/rpcontact_resm_esmc6b_expected_scores.npy)
-contains the original experiment's saved probabilities, with protein rows and RNA
-columns, matching `rpcontact_scores.npy`. After running the command above, compare
-the new prediction with that record:
-
-```bash
-python - <<'PY'
-import numpy as np
-pred = np.load("output_resm_esmc6b/rpcontact_scores.npy")
-ref = np.load("examples/rpcontact_resm_esmc6b_expected_scores.npy")
-np.testing.assert_allclose(pred, ref, rtol=1e-5, atol=1e-7)
-print(f"Prediction check passed; max absolute difference = {np.max(np.abs(pred - ref)):.3g}")
-PY
-```
-
-A CPU replay of this example differed from the original record by at most
-3.73e-8 in probability, with identical auROC and precision-recall metrics.
+| Input | Embeddings | Example pair |
+|---|---|---|
+| `examples/input.zip` | ERNIE-RNA + ESM-2 | 2ZZN_D_B |
+| `examples/input_resm_esmc.zip` | RESM-650M + ESMC-6B | 6ZYM_Y_t (validation pair for workflow checking) |
 
 ---
 
