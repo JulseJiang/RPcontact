@@ -292,7 +292,14 @@ sequence-padding masks in self- and cross-attention, and exclusion of padded or
 missing labels (`-999`) from loss and evaluation. Input embedding dimensions are
 inferred automatically, allowing either language model to be replaced.
 
-Start with the complete synthetic example:
+The bundled training example uses **synthetic data**.
+
+**Real data:** [RPcontact on Zenodo](https://doi.org/10.5281/zenodo.20971577)
+provides source sequences, contact-distance matrices and dataset metadata/splits.
+See the [training data instructions](training/README.md#run-the-bundled-example)
+for the files to download and preparation steps.
+
+Run the synthetic example:
 
 ```bash
 cd training

@@ -27,6 +27,15 @@ of different lengths and one pair each for validation, test and TS2. Labels incl
 `-999` missing positions. RNA/protein embedding channels are 8/12 to demonstrate
 automatic dimension inference. These are synthetic inputs for testing the workflow.
 
+**Real data:** download the RPcontact dataset from
+[Zenodo (10.5281/zenodo.20971577)](https://doi.org/10.5281/zenodo.20971577).
+[source_data.zip](https://zenodo.org/api/records/20971577/files/source_data.zip/content)
+contains real sequences and RNA–protein distance matrices under
+`source_data/2_training_ablation_validated_sequence/ablation_sequence_distance/`,
+and dataset annotations/split lists under `source_data/1_dataset_metadata/`.
+Prepare fixed embeddings with your chosen language models and convert the
+pair-level features/labels to the `.npy` manifest format described below for training.
+
 Run from this `training/` directory:
 
 ```bash
