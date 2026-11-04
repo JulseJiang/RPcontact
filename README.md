@@ -55,6 +55,7 @@ python rpcontact_cli.py \
 ```
 
 The example ZIP contains `pro.fasta`, `rna.fasta`, `pro.npy`, and `rna.npy`, so it runs the embedding checkpoint.
+The example is the 2ZZN_D_B complex. Its protein FASTA and one-hot features preserve threonine (`T`).
 By default, RPcontact exports the top 100 predicted contact pairs and the full contact probability matrix.
 
 ---
@@ -62,6 +63,10 @@ By default, RPcontact exports the top 100 predicted contact pairs and the full c
 ## Input Format
 
 RPcontact CLI accepts either an input directory or a ZIP file.
+
+For RNA, `T` is normalized to `U`. Protein sequences are preserved: protein `T`
+(threonine) must not be replaced with `U` (selenocysteine). Generate protein
+embeddings from the matching, unchanged protein sequence.
 
 Directory example:
 
