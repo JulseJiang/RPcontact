@@ -30,9 +30,12 @@ class EmbeddingPresetTests(unittest.TestCase):
 
     def test_resm_zip_and_directory_feature_layouts(self):
         archive = self.resm_archive
+        with zipfile.ZipFile(ROOT / 'examples/input.zip') as original, zipfile.ZipFile(archive) as alternative:
+            for fasta in ['pro.fasta', 'rna.fasta']:
+                self.assertEqual(original.read(fasta), alternative.read(fasta))
         protein, rna, pro_seq, rna_seq, mode, _ = cli.load_inputs(archive)
         self.assertEqual(mode, 'embedding')
-        self.assertEqual((protein.shape, rna.shape), ((56, 2580), (41, 1284)))
+        self.assertEqual((protein.shape, rna.shape), ((336, 2580), (75, 1284)))
         self.assertEqual(cli.select_embedding_variant(protein.shape[1], rna.shape[1]), 'resm-esmc6b')
         np.testing.assert_array_equal(protein[:, :20], cli.sequence_to_onehot(pro_seq, 'ACDEFGHIKLMNPQRSTVWY'))
         np.testing.assert_array_equal(rna[:, :4], cli.sequence_to_onehot(rna_seq, 'ACGU'))

@@ -69,7 +69,10 @@ Both ZIPs contain the same four filenames and use automatic checkpoint selection
 | Input | Embeddings | Example pair |
 |---|---|---|
 | `examples/input.zip` | ERNIE-RNA + ESM-2 | 2ZZN_D_B |
-| `examples/input_resm_esmc.zip` | RESM-650M + ESMC-6B | 6ZYM_Y_t (validation pair for workflow checking) |
+| `examples/input_resm_esmc.zip` | RESM-650M + ESMC-6B | 2ZZN_D_B |
+
+Both inputs use exactly the same full-length RNA/protein sequences (75 nucleotides
+and 336 residues); their language-model embeddings differ.
 
 ---
 
@@ -177,11 +180,13 @@ Main outputs:
 Optional files can be generated with `--save-npy`, `--plots`, and `--plot-heatmap`.
 
 Index note: nucleotide and residue labels use 1-based indexing.
+With `--save-npy`, `rpcontact_scores.npy` has protein rows and RNA columns;
+`rpcontact_full_map.txt` has RNA rows and protein columns.
 
 
 ## Embedding Preparation
 
-The bundled example already contains embeddings and can be run immediately.
+The bundled examples already contain embeddings and can be run immediately.
 
 For new sequences, FASTA files alone are sufficient. To run the embedding-based model, generate `rna.npy` and `pro.npy` with the helper scripts below and place them next to the matching FASTA files.
 
@@ -206,14 +211,14 @@ for RNA (`rna.npy`: `[RNA length, 1280]`) and **ESMC-6B** for protein (`pro.npy`
 `[protein length, 2560]`). Remove special tokens and retain every sequence position.
 The CLI adds RNA/protein one-hot channels, giving 1284/2580 total input channels.
 Arrays with one-hot channels already included are also accepted in either
-one-hot-first or one-hot-last order. Model selection is automatic; `--model
-resm-esmc6b` is available as an optional manual override. Supply embeddings from
+one-hot-first or one-hot-last order. Model selection is automatic;
+`--model resm-esmc6b` is available as an optional manual override. Supply embeddings from
 the corresponding encoders; matching channel counts alone do not make other
 language-model embeddings interchangeable.
 
 These are the trained contact-prediction weights; RNA/protein language-model
 embedding extraction is a separate step. The ERNIE-RNA and ESM-2 helper scripts
-below are for the default `rpcontact` model.
+below are for the ERNIE-RNA + ESM-2 (`rpcontact`) preset.
 
 ### RNA Embedding With ERNIE-RNA
 
