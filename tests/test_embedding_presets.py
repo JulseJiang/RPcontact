@@ -102,6 +102,8 @@ class EmbeddingPresetTests(unittest.TestCase):
             for r in range(0, len(rna), 15):
                 actual[p:p+20, r:r+15] = cli.score_block(deployed, f_pro, f_rna, p, min(p+20, len(protein)), r, min(r+15, len(rna)))
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-6)
+        recorded = np.load(ROOT / 'examples/rpcontact_resm_esmc6b_expected_scores.npy')
+        np.testing.assert_allclose(actual, recorded, rtol=1e-5, atol=1e-7)
 
 
 if __name__ == '__main__':

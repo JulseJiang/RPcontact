@@ -69,6 +69,25 @@ python rpcontact_cli.py \
 This example is the 6ZYM_Y_t validation pair (41 RNA nucleotides and 56 protein
 residues). It demonstrates inference with the alternative encoders.
 
+The optional reference matrix
+[`examples/rpcontact_resm_esmc6b_expected_scores.npy`](examples/rpcontact_resm_esmc6b_expected_scores.npy)
+contains the original experiment's saved probabilities, with protein rows and RNA
+columns, matching `rpcontact_scores.npy`. After running the command above, compare
+the new prediction with that record:
+
+```bash
+python - <<'PY'
+import numpy as np
+pred = np.load("output_resm_esmc6b/rpcontact_scores.npy")
+ref = np.load("examples/rpcontact_resm_esmc6b_expected_scores.npy")
+np.testing.assert_allclose(pred, ref, rtol=1e-5, atol=1e-7)
+print(f"Prediction check passed; max absolute difference = {np.max(np.abs(pred - ref)):.3g}")
+PY
+```
+
+A CPU replay of this example differed from the original record by at most
+3.73e-8 in probability, with identical auROC and precision-recall metrics.
+
 ---
 
 ## Input Format
