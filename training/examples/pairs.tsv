@@ -1,0 +1,6 @@
+pairid	split	rna_onehot	protein_onehot	rna_embedding	protein_embedding	label
+pair_train	train	onehot/rna_train.npy	onehot/protein_train.npy	embeddings/new_rna_lm/rna_train.npy	embeddings/new_protein_lm/protein_train.npy	labels/pair_train.npy
+pair_train2	train	onehot/rna_train2.npy	onehot/protein_train2.npy	embeddings/new_rna_lm/rna_train2.npy	embeddings/new_protein_lm/protein_train2.npy	labels/pair_train2.npy
+pair_val	val	onehot/rna_val.npy	onehot/protein_val.npy	embeddings/new_rna_lm/rna_val.npy	embeddings/new_protein_lm/protein_val.npy	labels/pair_val.npy
+pair_test	test	onehot/rna_test.npy	onehot/protein_test.npy	embeddings/new_rna_lm/rna_test.npy	embeddings/new_protein_lm/protein_test.npy	labels/pair_test.npy
+pair_ts2	ts2	onehot/rna_ts2.npy	onehot/protein_ts2.npy	embeddings/new_rna_lm/rna_ts2.npy	embeddings/new_protein_lm/protein_ts2.npy	labels/pair_ts2.npy

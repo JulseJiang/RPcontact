@@ -233,6 +233,33 @@ You can also compress the input directory as shown in the Input Format section.
 
 ---
 
+## Training with Alternative Language Models
+
+The [training module](training/README.md) trains the downstream contact predictor
+with fixed RNA/protein embeddings. It supports batch sizes greater than 1,
+sequence-padding masks in self- and cross-attention, and exclusion of padded or
+missing labels (`-999`) from loss and evaluation. Input embedding dimensions are
+inferred automatically, allowing either language model to be replaced.
+
+Start with the complete synthetic example:
+
+```bash
+cd training
+python -m pip install -r requirements.txt
+python prepare_data.py --manifest examples/pairs.tsv --output prepared/example
+python train.py \
+  --train-data prepared/example/train.pickle \
+  --val-data prepared/example/val.pickle \
+  --output runs/example \
+  --batchsize 2 --max-epochs 2 --device cpu --threads 2
+```
+
+See the training README for label formats, custom embeddings, GPU training,
+checkpoint selection, and time/memory outputs. Language-model embedding extraction
+is a separate step. Training dependencies are listed in `training/requirements.txt`.
+
+---
+
 ## Contact & Citation
 
 Questions or suggestions? Contact:
